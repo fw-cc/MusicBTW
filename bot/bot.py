@@ -8,12 +8,18 @@ from discord.ext import commands
 
 
 class MusicBTW(commands.Bot):
-    def __init__(self, command_prefix, description=None, **options) -> None:
+    def __init__(self, command_prefix, download_loc="", description=None, **options) -> None:
         super().__init__(command_prefix, description=description, **options)
         self.start_datetime = datetime.datetime.now()
         self.logger = self.__config_logging(logging_level=logging.DEBUG)
         self.logger.info(f"Command prefix: {command_prefix}")
         # Any other statup stuffs can go here
+        path, _, cogs = next(os.walk("./bot/modules/"))
+        for cog in cogs:
+            # This is kinda naughty, when config eventually gets added, would be a good idea
+            # to make the bot only load what it's told to from configs.
+            if "__" not in cog:
+                self.load_extension(f"{path}{cog}".lstrip("./").replace("/", ".").rstrip(".py"))
     
     @staticmethod
     def __config_logging(logging_level=logging.INFO, outdir="./logs"):
