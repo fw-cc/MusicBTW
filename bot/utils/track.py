@@ -1,4 +1,4 @@
-import downloader
+import bot.utils.downloader as downloader
 
 from typing import Optional, List
 import logging
