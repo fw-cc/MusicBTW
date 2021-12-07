@@ -13,7 +13,6 @@ class Interface(commands.Cog):
         self.sourcer = Sourcer(bot)
         self.logger = logging.getLogger("MusicBTW.Interface")
 
-    @commands.Cog.listener()
     def cog_unload(self):
         self.player.stop()
 
