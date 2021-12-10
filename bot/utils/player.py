@@ -7,16 +7,16 @@ class Player:
     def __init__(self, bot) -> None:
         self.logger = logging.getLogger("MusicBTW.Player")
         self.current_track = None
-        self.__playing = False
+        self.__isplaying = False
         self.__queue = Queue(bot)
 
     @property
     def queue(self):
         return self.__queue.queue
-
+    
     @property
-    def playing(self):
-        return self.current_track.playing
+    def is_playing(self):
+        return self.__isplaying
     
     def pause(self):
         pass
