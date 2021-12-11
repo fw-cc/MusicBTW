@@ -1,6 +1,7 @@
 from queue import Queue
 
 import logging
+import asyncio
 
 
 class Player:
@@ -8,6 +9,7 @@ class Player:
         self.logger = logging.getLogger("MusicBTW.Player")
         self.current_track = None
         self.__isplaying = False
+        self.__source = None
         self.__queue = Queue(bot)
 
     @property
@@ -28,4 +30,7 @@ class Player:
         self.__queue.clear()
 
     async def next(self):
-        self.current_track = self.__queue.next()
+        self.current_track = await self.__queue.next()
+
+    async def __gen_audio_source(self):
+        pass

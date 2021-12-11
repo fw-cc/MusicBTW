@@ -14,6 +14,9 @@ class Queue:
         self.bot = bot
         self.__queued_tracks = []
     
+    def __len__(self):
+        return len(self.__queued_tracks)
+    
     @property
     def queue(self) -> List[Track]:
         """Queue list getter
@@ -23,7 +26,7 @@ class Queue:
         """
         return self.__queued_tracks
 
-    def add(self, tracks: Union[Track, List[Track]]):
+    async def add(self, tracks: Union[Track, List[Track]]):
         """Adds a Track or list of Tracks to the playlist.
 
         Args:
@@ -42,25 +45,25 @@ class Queue:
             self.logger.debug(f"Added {len(tracks)} tracks to queue.")
 
         if preload:
-            self.__queued_tracks[0].load()
+            await self.__queued_tracks[0].load()
 
-    def next(self) -> Union[None, Track]:
+    async def next(self) -> Union[None, Track]:
         """Returns (by pop) the next (zeroth) Track of the queue."""
         if len(self.queue) == 0:
             return None
         try:
             if not self.__queued_tracks[1].ready_to_play:
-                self.__queued_tracks[1].load()
+                await self.__queued_tracks[1].load()
         except IndexError:
             pass
         return self.__queued_tracks.pop(0)
     
-    def shuffle(self):
+    async def shuffle(self):
         """Shuffles the queue."""
         if first_track := self.__queued_tracks[0].ready_to_play:
             first_track.unload()
         random.shuffle(self.__queued_tracks)
-        self.__queued_tracks[0].load()
+        await self.__queued_tracks[0].load()
     
     def clear(self):
         """Clear the queue."""

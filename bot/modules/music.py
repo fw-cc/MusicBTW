@@ -9,7 +9,7 @@ import logging
 class Interface(commands.Cog):
     def __init__(self, bot) -> None:
         self.bot = bot
-        self.player = Player(bot)
+        self.player = {Player(bot)}
         self.sourcer = Sourcer(bot)
         self.logger = logging.getLogger("MusicBTW.Interface")
 
