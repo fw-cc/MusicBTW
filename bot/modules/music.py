@@ -1,5 +1,6 @@
-from bot.utils.player import Player
-from bot.utils.sourcer import Sourcer
+# Commented as moving to Lavalink backend
+# from bot.utils.player import Player
+# from bot.utils.sourcer import Sourcer
 
 from discord.ext import commands
 
@@ -9,8 +10,9 @@ import logging
 class Interface(commands.Cog):
     def __init__(self, bot) -> None:
         self.bot = bot
-        self.player = {Player(bot)}
-        self.sourcer = Sourcer(bot)
+        # Commented for move to Lavalink backend
+        # self.player = {Player(bot)}
+        # self.sourcer = Sourcer(bot)
         self.logger = logging.getLogger("MusicBTW.Interface")
 
     def cog_unload(self):
