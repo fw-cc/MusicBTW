@@ -2,7 +2,7 @@ services:
   bot:
     image: pytato/musicbtw:dev
     env_file:
-      - .\.MusicBTWvenv\.env
+      - ./.env
     networks:
       - backend
     
