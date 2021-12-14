@@ -1,5 +1,3 @@
-/.cache
-/.MusicBTWvenv
-/.vscode
+/.*
 *.pyc
 *.cpython-39.pyc
