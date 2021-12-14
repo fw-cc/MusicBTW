@@ -9,6 +9,7 @@ class HandlersCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("MusicBTW.Handlers")
+        self.logger.debug("test")
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
@@ -20,6 +21,7 @@ class HandlersCog(commands.Cog):
         if type(error) not in silent_exceptions:
             print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)
             traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+            self.logger.exception("Exception occurred", exc_info=(type(error), error, error.__traceback__))
         elif type(error) == commands.PrivateMessageOnly:
             await ctx.message.delete()
             await ctx.send(f"{error}", delete_after=10)

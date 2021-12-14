@@ -1,6 +1,4 @@
-# Commented as moving to Lavalink backend
-# from bot.utils.player import Player
-# from bot.utils.sourcer import Sourcer
+from bot.utils.spotify import Sourcer
 
 from discord.ext import commands
 import discord
@@ -88,17 +86,19 @@ class LavalinkVoiceClient(discord.VoiceClient):
 class Interface(commands.Cog):
     def __init__(self, bot) -> None:
         self.logger = logging.getLogger("MusicBTW.Interface")
+        self.logger.debug("test")
         self.bot = bot
-        # Commented for move to Lavalink backend
-        # self.player = {Player(bot)}
-        # self.sourcer = Sourcer(bot)
-
-        if not hasattr(bot, 'lavalink'):  # This ensures the client isn't overwritten during cog reloads.
-            bot.lavalink = lavalink.Client(bot.user.id)
-            self.logger.info("Attempting to connect to Lavalink, may fail on first attempt in docker-compose.")
-            bot.lavalink.add_node('lavalink', 2333, 'youshallnotpass', 'eu', 'default-node')
-            self.logger.info("Added Lavalink node, will query until success.")
-
+        self.sourcer = None
+        try:
+            if not hasattr(bot, 'lavalink'):  # This ensures the client isn't overwritten during cog reloads.
+                bot.lavalink = lavalink.Client(bot.user.id)
+                self.logger.info("Attempting to connect to Lavalink, may fail on first attempt in docker-compose.")
+                bot.lavalink.add_node('lavalink', 2333, 'youshallnotpass', 'eu', 'default-node')
+                self.logger.info("Added Lavalink node, will query until success.")
+            else:
+                self.logger.debug("Interface reloaded, bot has lavalink attribute already")
+        except Exception as e:
+            self.logger.debug(e)
         # Probably worth adding some kind of decorator event hook registration interface
         # to lavalink.py at some point...
         lavalink.add_event_hook(self.on_queue_end, event=lavalink.events.QueueEndEvent)
@@ -107,6 +107,8 @@ class Interface(commands.Cog):
         lavalink.add_event_hook(self.on_node_change, event=lavalink.events.NodeChangedEvent)
 
     async def on_node_connect(self, event):
+        if self.sourcer is None:
+            self.sourcer = Sourcer()
         self.logger.info("Connected to {0.name} at {0.host}:{0.port}".format(event.node))
     
     async def on_node_disconnect(self, event):
@@ -118,13 +120,13 @@ class Interface(commands.Cog):
     async def on_queue_end(self, event):
         # Triggered on "QueueEndEvent" from lavalink.py
         # it indicates that there are no tracks left in the player's queue.
-        # To save on resources, we can tell the bot to disconnect from the voicechannel.
+        # To save on resources, we can tell the bot to disconnect from the voice channel.
         guild_id = int(event.player.guild_id)
         guild = self.bot.get_guild(guild_id)
         await guild.voice_client.disconnect(force=True)
 
     async def ensure_voice(self, ctx):
-        """ This check ensures that the bot and command author are in the same voicechannel. """
+        """ This check ensures that the bot and command author are in the same voice channel. """
         player = self.bot.lavalink.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
         # Create returns a player if one exists, otherwise creates.
         # This line is important because it ensures that a player always exists for a guild.
@@ -132,15 +134,15 @@ class Interface(commands.Cog):
         # Most people might consider this a waste of resources for guilds that aren't playing, but this is
         # the easiest and simplest way of ensuring players are created.
 
-        # These are commands that require the bot to join a voicechannel (i.e. initiating playback).
-        # Commands such as volume/skip etc don't require the bot to be in a voicechannel so don't need listing here.
+        # These are commands that require the bot to join a voice channel (i.e. initiating playback).
+        # Commands such as volume/skip etc don't require the bot to be in a voice channel so don't need listing here.
         should_connect = ctx.command.name in ('play',)
 
         if not ctx.author.voice or not ctx.author.voice.channel:
-            # Our cog_command_error handler catches this and sends it to the voicechannel.
+            # Our cog_command_error handler catches this and sends it to the voice channel.
             # Exceptions allow us to "short-circuit" command invocation via checks so the
             # execution state of the command goes no further.
-            raise commands.CommandInvokeError('Join a voicechannel first.')
+            raise commands.CommandInvokeError('Join a voice channel first.')
 
         if not player.is_connected:
             if not should_connect:
@@ -155,7 +157,7 @@ class Interface(commands.Cog):
             await ctx.author.voice.channel.connect(cls=LavalinkVoiceClient)
         else:
             if int(player.channel_id) != ctx.author.voice.channel.id:
-                raise commands.CommandInvokeError('You need to be in my voicechannel.')
+                raise commands.CommandInvokeError('You need to be in my voice channel.')
 
     def cog_unload(self):
         self.bot.lavalink._event_hooks.clear()
@@ -168,7 +170,7 @@ class Interface(commands.Cog):
 
         if guild_check:
             await self.ensure_voice(ctx)
-            #  Ensure that the bot and command author share a mutual voicechannel.
+            #  Ensure that the bot and command author share a mutual voice channel.
 
         return guild_check
 
@@ -186,45 +188,81 @@ class Interface(commands.Cog):
         # Remove leading and trailing <>. <> may be used to suppress embedding links in Discord.
         query = query.strip('<>')
 
-        # Check if the user input might be a URL. If it isn't, we can Lavalink do a YouTube search for it instead.
-        # SoundCloud searching is possible by prefixing "scsearch:" instead.
-        if not url_rx.match(query):
-            query = f'ytsearch:{query}'
-
-        # Get the results for the query from Lavalink.
-        results = await player.node.get_tracks(query)
-
-        # Results could be None if Lavalink returns an invalid response (non-JSON/non-200 (OK)).
-        # ALternatively, resullts['tracks'] could be an empty array if the query yielded no tracks.
-        if not results or not results['tracks']:
-            return await ctx.send('Nothing found!')
-
-        embed = discord.Embed(color=discord.Color.blurple())
-
-        # Valid loadTypes are:
-        #   TRACK_LOADED    - single video/direct URL)
-        #   PLAYLIST_LOADED - direct URL to playlist)
-        #   SEARCH_RESULT   - query prefixed with either ytsearch: or scsearch:.
-        #   NO_MATCHES      - query yielded no results
-        #   LOAD_FAILED     - most likely, the video encountered an exception during loading.
-        if results['loadType'] == 'PLAYLIST_LOADED':
-            tracks = results['tracks']
-
-            for track in tracks:
-                # Add all of the tracks from the playlist to the queue.
-                player.add(requester=ctx.author.id, track=track)
-
-            embed.title = 'Playlist Enqueued!'
-            embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks'
-        else:
-            track = results['tracks'][0]
-            embed.title = 'Track Enqueued'
-            embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
-
+        def track_load_handler(loc_results, spotify=False):
+            track = loc_results['tracks'][0]
+            if not spotify or res_type == "track":
+                embed.title = 'Track Enqueued'
+                embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
             # You can attach additional information to audiotracks through kwargs, however this involves
             # constructing the AudioTrack class yourself.
             track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
             player.add(requester=ctx.author.id, track=track)
+
+        # Check if the user input might be a URL. If it isn't, we can Lavalink do a YouTube search for it instead.
+        # SoundCloud searching is possible by prefixing "scsearch:" instead.
+        from_spotify = False
+        res_type = None
+        newly_queued_tracks = 0
+        if not url_rx.match(query):
+            query = f'ytsearch:{query}'
+            results = await player.node.get_tracks(query)
+        elif "spotify" in query and self.sourcer is not None:
+            # Use the extra special sourcer to get good equivalents
+            # of spotify tracks on the youtube
+            # results, res_type = await self.sourcer.get_tracks(query, player.node)
+            async for result, res_type in self.sourcer.get_tracks(query, player.node):
+                if not result or not result['tracks']:
+                    pass
+                else:
+                    track_load_handler(result, spotify=True)
+                    newly_queued_tracks += 1
+                    if newly_queued_tracks == 1 and not player.is_playing:
+                        await player.play()
+            from_spotify = True
+        else:
+            # Get the results for the query from Lavalink.
+            results = await player.node.get_tracks(query)
+
+        # Results could be None if Lavalink returns an invalid response (non-JSON/non-200 (OK)).
+        # ALternatively, results['tracks'] could be an empty array if the query yielded no tracks.
+        # if from_spotify:
+        #     for index, result in enumerate(results):
+        #         if not result or not result['tracks']:
+        #             del results[index]
+        #     if not results:
+        #         await ctx.send("No results")
+        # else:
+        #     if not results or not results['tracks']:
+        #             return await ctx.send('No results')
+        if not from_spotify:
+            if not results or not results['tracks']:
+                return await ctx.send('No results')
+
+        embed = discord.Embed(color=discord.Color.blurple())
+        
+        if from_spotify:
+            embed.title = f"{res_type.capitalize()} Enqueued"
+            embed.description = f"{newly_queued_tracks} tracks added."
+
+        else:
+            # Kept here to protect from things being unhappy
+            # Valid loadTypes are:
+            #   TRACK_LOADED    - single video/direct URL)
+            #   PLAYLIST_LOADED - direct URL to playlist)
+            #   SEARCH_RESULT   - query prefixed with either ytsearch: or scsearch:.
+            #   NO_MATCHES      - query yielded no results
+            #   LOAD_FAILED     - most likely, the video encountered an exception during loading.
+            if results['loadType'] == 'PLAYLIST_LOADED':
+                tracks = results['tracks']
+
+                for track in tracks:
+                    # Add all of the tracks from the playlist to the queue.
+                    player.add(requester=ctx.author.id, track=track)
+
+                embed.title = 'Playlist Enqueued'
+                embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks' 
+            else:
+                track_load_handler(results)
 
         await ctx.send(embed=embed)
 

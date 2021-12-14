@@ -11,7 +11,8 @@ class MusicBTW(commands.Bot):
     def __init__(self, command_prefix, description=None, **options) -> None:
         super().__init__(command_prefix, description=description, **options)
         self.start_datetime = datetime.datetime.now()
-        self.logger = self.__config_logging(logging_level=logging.DEBUG)
+        self.logging_level = logging.DEBUG
+        self.logger = self.__config_logging()
         self.logger.info(f"Command prefix: {command_prefix}")
         # Any other statup stuffs can go here
 
@@ -23,14 +24,16 @@ class MusicBTW(commands.Bot):
             if "__" not in cog:
                 sanitised_cog_name = f"{path}{cog}".lstrip("./").replace("/", ".").rstrip(".py")
                 try:
+                    self.logger.info(f"Loading {sanitised_cog_name}")
                     self.load_extension(sanitised_cog_name)
                 except commands.ExtensionAlreadyLoaded:
-                    pass
+                    self.logger.debug(f"{sanitised_cog_name} already loaded")
+                except Exception as e:
+                    self.logger.exception(e)
     
-    @staticmethod
-    def __config_logging(logging_level=logging.INFO, outdir="./logs"):
+    def __config_logging(self, outdir="./logs"):
         logger = logging.getLogger("MusicBTW")
-        logger.setLevel(logging_level)
+        logger.setLevel(self.logging_level)
         formatter = logging.Formatter('[{asctime}] [{levelname:}] {name}: {message}',
                                       '%Y-%m-%d %H:%M:%S', style='{')
         # file_log = handlers.RotatingFileHandler(f'{outdir}/{self.start_datetime.strftime("%Y%m%d_%H%M%S")}.log',
