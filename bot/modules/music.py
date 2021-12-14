@@ -234,7 +234,7 @@ class Interface(commands.Cog):
             await player.play()
 
     def sender_is_in_channel(self, ctx, player):
-        return not (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id))
+        return player.is_connected and ctx.author.voice.channel.id == int(player.channel_id)
 
     @commands.command(aliases=['dc'])
     async def disconnect(self, ctx):
@@ -280,21 +280,26 @@ class Interface(commands.Cog):
         await ctx.voice_client.disconnect(force=True)
         await ctx.send('*⃣ | Disconnected.')
 
-    # @commands.command()
-    # async def pause(self, ctx):
-    #     """Pauses playback."""
-    #     if not self.sender_is_in_channel(ctx):
-    #         return
-    #     player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-    #     await player.stop()
+    @commands.command()
+    async def pause(self, ctx):
+        """Pauses playback."""
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not self.sender_is_in_channel(ctx, player):
+            return
+        if not player.paused:
+            self.logger.debug("Pausing player")
+            await player.set_pause(True)
 
-    # @commands.command()
-    # async def resume(self, ctx):
-    #     """Resumes playback."""
-    #     if not self.sender_is_in_channel(ctx):
-    #         return
-    #     player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-    #     await player.play()
+    @commands.command()
+    async def resume(self, ctx):
+        """Resumes playback."""
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not self.sender_is_in_channel(ctx, player):
+            self.logger.debug(self.sender_is_in_channel)
+            return
+        if player.paused:
+            self.logger.debug("Resuming player")
+            await player.set_pause(False)
 
     async def cog_check(self, ctx):
         if not ctx.guild:
