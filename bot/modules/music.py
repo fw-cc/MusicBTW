@@ -92,20 +92,36 @@ class Interface(commands.Cog):
         # Commented for move to Lavalink backend
         # self.player = {Player(bot)}
         # self.sourcer = Sourcer(bot)
+
         if not hasattr(bot, 'lavalink'):  # This ensures the client isn't overwritten during cog reloads.
             bot.lavalink = lavalink.Client(bot.user.id)
+            self.logger.info("Attempting to connect to Lavalink, may fail on first attempt in docker-compose.")
             bot.lavalink.add_node('lavalink', 2333, 'youshallnotpass', 'eu', 'default-node')
-            self.logger.info("Added Lavalink node")
-        lavalink.add_event_hook(self.track_hook)
+            self.logger.info("Added Lavalink node, will query until success.")
 
-    async def track_hook(self, event):
-        if isinstance(event, lavalink.events.QueueEndEvent):
-            # When this track_hook receives a "QueueEndEvent" from lavalink.py
-            # it indicates that there are no tracks left in the player's queue.
-            # To save on resources, we can tell the bot to disconnect from the voicechannel.
-            guild_id = int(event.player.guild_id)
-            guild = self.bot.get_guild(guild_id)
-            await guild.voice_client.disconnect(force=True)
+        # Probably worth adding some kind of decorator event hook registration interface
+        # to lavalink.py at some point...
+        lavalink.add_event_hook(self.on_queue_end, event=lavalink.events.QueueEndEvent)
+        lavalink.add_event_hook(self.on_node_connect, event=lavalink.events.NodeConnectedEvent)
+        lavalink.add_event_hook(self.on_node_disconnect, event=lavalink.events.NodeDisconnectedEvent)
+        lavalink.add_event_hook(self.on_node_change, event=lavalink.events.NodeChangedEvent)
+
+    async def on_node_connect(self, event):
+        self.logger.info("Connected to {0.name} at {0.host}:{0.port}".format(event.node))
+    
+    async def on_node_disconnect(self, event):
+        self.logger.info("Disconnected from {0.node.name} with code {0.code} and reason {0.reason}".format(event))
+    
+    async def on_node_change(self, event):
+        self.logger.info("Node changed from {0.name} to {1.name}".format(event.old_node, event.new_node))
+
+    async def on_queue_end(self, event):
+        # Triggered on "QueueEndEvent" from lavalink.py
+        # it indicates that there are no tracks left in the player's queue.
+        # To save on resources, we can tell the bot to disconnect from the voicechannel.
+        guild_id = int(event.player.guild_id)
+        guild = self.bot.get_guild(guild_id)
+        await guild.voice_client.disconnect(force=True)
 
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
@@ -217,8 +233,7 @@ class Interface(commands.Cog):
         if not player.is_playing:
             await player.play()
 
-    def sender_is_in_channel(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+    def sender_is_in_channel(self, ctx, player):
         return not (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id))
 
     @commands.command(aliases=['dc'])
@@ -228,17 +243,16 @@ class Interface(commands.Cog):
 
         if not player.is_connected:
             # We can't disconnect, if we're not connected.
-            return await ctx.send('Not connected.')
+            return await ctx.send('Not connected to any voice channel.')
 
-        if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
+        if not ctx.author.voice or self.sender_is_in_channel(ctx, player):
             # Abuse prevention. Users not in voice channels, or not in the same voice channel as the bot
             # may not disconnect the bot.
-            return await ctx.send('You\'re not in my voicechannel!')
+            return
         
         await self._dc(player)
         # Disconnect from the voice channel.
         await ctx.voice_client.disconnect(force=True)
-        await ctx.send('*⃣ | Disconnected.')
 
     async def _dc(self, player):
         # Clear the queue to ensure old tracks don't start playing
@@ -250,17 +264,17 @@ class Interface(commands.Cog):
     @commands.command()
     async def skip(self, ctx):
         """Skips the current entry in the queue."""
-        if not self.sender_is_in_channel(ctx):
-            return
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not self.sender_is_in_channel(ctx, player):
+            return
         await player.skip()
 
     @commands.command()
     async def stop(self, ctx):
         """Stops playback and clears the queue."""
-        if not self.sender_is_in_channel(ctx):
-            return
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not self.sender_is_in_channel(ctx, player):
+            return
         await self._dc(player)
         # Disconnect from the voice channel.
         await ctx.voice_client.disconnect(force=True)
