@@ -8,7 +8,7 @@ from discord.ext import commands
 
 
 class MusicBTW(commands.Bot):
-    def __init__(self, command_prefix, download_loc="", description=None, **options) -> None:
+    def __init__(self, command_prefix, description=None, **options) -> None:
         super().__init__(command_prefix, description=description, **options)
         self.start_datetime = datetime.datetime.now()
         self.logger = self.__config_logging(logging_level=logging.DEBUG)
