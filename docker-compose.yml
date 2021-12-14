@@ -1,0 +1,18 @@
+services:
+  bot:
+    image: pytato/musicbtw:dev
+    env_file:
+      - .\.MusicBTWvenv\.env
+    networks:
+      - backend
+    
+  lavalink:
+    image: fredboat/lavalink:master
+    networks:
+      - backend
+    volumes:
+      - ./config/lavalink/application.yml:/opt/Lavalink/application.yml
+      - ./logs/lavalink:/opt/Lavalink/logs
+
+networks:
+  backend:
