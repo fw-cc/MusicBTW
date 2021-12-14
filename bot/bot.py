@@ -14,12 +14,18 @@ class MusicBTW(commands.Bot):
         self.logger = self.__config_logging(logging_level=logging.DEBUG)
         self.logger.info(f"Command prefix: {command_prefix}")
         # Any other statup stuffs can go here
+
+    async def on_ready(self):
         path, _, cogs = next(os.walk("./bot/modules/"))
         for cog in cogs:
             # This is kinda naughty, when config eventually gets added, would be a good idea
             # to make the bot only load what it's told to from configs.
             if "__" not in cog:
-                self.load_extension(f"{path}{cog}".lstrip("./").replace("/", ".").rstrip(".py"))
+                sanitised_cog_name = f"{path}{cog}".lstrip("./").replace("/", ".").rstrip(".py")
+                try:
+                    self.load_extension(sanitised_cog_name)
+                except commands.ExtensionAlreadyLoaded:
+                    pass
     
     @staticmethod
     def __config_logging(logging_level=logging.INFO, outdir="./logs"):
