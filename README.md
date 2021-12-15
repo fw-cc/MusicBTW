@@ -28,6 +28,7 @@ See 👀 below 👇 for the feature hitlist 🎯!
 - [ ] Purge queue command (clear queue of tracks from people no longer in the call) (may be dank, idk yet)
 - [ ] Slash command implementation (moderately dank)
 - [ ] Improving Spotify based track pulls with cross-correlation and that (highly dank)
+- [ ] Build automation (haven't a clue how dank, not really programming either sooooooo)
 
 If you like the sound of one of these to work on, we'll do a bit of that "ReqUirEmeNTs AnAlYSIs" so there's a clear target.
 
