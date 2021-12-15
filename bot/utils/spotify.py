@@ -15,12 +15,11 @@ class Sourcer:
         # title, album, and artist for Lavalink to query.
         self.logger.debug(spotify_track)
         artists = [artist["name"] for artist in spotify_track["artists"]]
-        self.logger.debug(f"Attempting to get youtube equivalent of track {spotify_track}")
-        self.logger.debug(f"ytsearch:{spotify_track['name']} {spotify_track['album']['name']}")
         query = f"ytsearch:{spotify_track['name']} {spotify_track['album']['name']}"
         # query = f"ytsearch:{spotify_track['name']}"
         for artist in artists:
             query = f"{query} {artist}"
+        self.logger.debug(query)
         return await node.get_tracks(query)
 
     def __spotify_tracks_getter(self, spotify_response, from_album=False, from_playlist=False):
