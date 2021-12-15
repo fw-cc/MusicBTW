@@ -21,6 +21,7 @@ class LavalinkVoiceClient(discord.VoiceClient):
     def __init__(self, client, voice_channel):
         self.client = self.bot = client
         self.channel = voice_channel
+        self.is_playing_bgm = False
         # In the case there's an existing lavalink link link link
         if hasattr(self.client, "lavalink"):
             self.lavalink = self.client.lavalink
@@ -122,9 +123,11 @@ class Interface(commands.Cog):
         # Triggered on "QueueEndEvent" from lavalink.py
         # it indicates that there are no tracks left in the player's queue.
         # To save on resources, we can tell the bot to disconnect from the voice channel.
-        guild_id = int(event.player.guild_id)
-        guild = self.bot.get_guild(guild_id)
-        await guild.voice_client.disconnect(force=True)
+        self.logger.debug("QueueEndEvent triggered")
+        if not event.player.is_playing_bgm:
+            guild_id = int(event.player.guild_id)
+            guild = self.bot.get_guild(guild_id)
+            await guild.voice_client.disconnect(force=True)
 
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voice channel. """
@@ -175,19 +178,10 @@ class Interface(commands.Cog):
 
         return guild_check
 
-    # @commands.command()
-    # async def play(self, ctx, link: str):
-    #     """Add track(s) contained within `link` to the queue, must be a valid Youtube 
-    #     video/playlist or Spotify Album, Playlist, or track."""
-    #     pass
-    
-    @commands.command(aliases=['p'])
-    async def play(self, ctx, *, query: str):
-        """ Searches and plays a song from a given query. """
-        # Get the player for this guild from cache.
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-        # Remove leading and trailing <>. <> may be used to suppress embedding links in Discord.
+    async def _play(self, ctx, player: lavalink.BasePlayer, query: str):
         query = query.strip('<>')
+
+        embed = discord.Embed(color=discord.Color.blurple())
 
         def track_load_handler(loc_results, spotify=False):
             track = loc_results['tracks'][0]
@@ -224,22 +218,9 @@ class Interface(commands.Cog):
             # Get the results for the query from Lavalink.
             results = await player.node.get_tracks(query)
 
-        # Results could be None if Lavalink returns an invalid response (non-JSON/non-200 (OK)).
-        # ALternatively, results['tracks'] could be an empty array if the query yielded no tracks.
-        # if from_spotify:
-        #     for index, result in enumerate(results):
-        #         if not result or not result['tracks']:
-        #             del results[index]
-        #     if not results:
-        #         await ctx.send("No results")
-        # else:
-        #     if not results or not results['tracks']:
-        #             return await ctx.send('No results')
         if not from_spotify:
             if not results or not results['tracks']:
                 return await ctx.send('No results')
-
-        embed = discord.Embed(color=discord.Color.blurple())
         
         if from_spotify:
             embed.title = f"{res_type.capitalize()} Enqueued"
@@ -265,7 +246,107 @@ class Interface(commands.Cog):
             else:
                 track_load_handler(results)
 
-        await ctx.send(embed=embed)
+        # We don't want to call .play() if the player is playing as that will effectively skip
+        # the current track.
+        if not player.is_playing:
+            await player.play()
+
+        return embed
+
+    # @commands.group()
+    # async def bgm(self, ctx: commands.Context):
+    #     """Command group for BGM management"""
+    #     if ctx.invoked_subcommand is None:
+    #         pass
+
+    @commands.command
+    async def bgm(self, ctx: commands.Context, *, query: str):
+        """Sets the player to queue and play background music until overwritten
+        or told to stop.
+        """
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        voice_client = ctx.guild.voice_client
+        # Stops the bot from running through the full on_queue_end method
+        voice_client.is_playing_bgm = True
+        await player.stop()
+        player.set_repeat(True)
+        player.set_shuffle(True)
+        play_embed = await self._play(ctx, player, query)
+    
+    @commands.command(aliases=['p'])
+    async def play(self, ctx, *, query: str):
+        """Searches and plays a song from a given query."""
+        # Get the player for this guild from cache.
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        # Remove leading and trailing <>. <> may be used to suppress embedding links in Discord.
+        query = query.strip('<>')
+
+        # def track_load_handler(loc_results, spotify=False):
+        #     track = loc_results['tracks'][0]
+        #     if not spotify or res_type == "track":
+        #         embed.title = 'Track Enqueued'
+        #         embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
+        #     # You can attach additional information to audiotracks through kwargs, however this involves
+        #     # constructing the AudioTrack class yourself.
+        #     track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
+        #     player.add(requester=ctx.author.id, track=track)
+
+        # # Check if the user input might be a URL. If it isn't, we can Lavalink do a YouTube search for it instead.
+        # # SoundCloud searching is possible by prefixing "scsearch:" instead.
+        # from_spotify = False
+        # res_type = None
+        # newly_queued_tracks = 0
+        # if not url_rx.match(query):
+        #     query = f'ytsearch:{query}'
+        #     results = await player.node.get_tracks(query)
+        # elif "spotify" in query and self.sourcer is not None:
+        #     # Use the extra special sourcer to get good equivalents
+        #     # of spotify tracks on the youtube
+        #     # results, res_type = await self.sourcer.get_tracks(query, player.node)
+        #     async for result, res_type in self.sourcer.get_tracks(query, player.node):
+        #         if not result or not result['tracks']:
+        #             pass
+        #         else:
+        #             track_load_handler(result, spotify=True)
+        #             newly_queued_tracks += 1
+        #             if newly_queued_tracks == 1 and not player.is_playing:
+        #                 await player.play()
+        #     from_spotify = True
+        # else:
+        #     # Get the results for the query from Lavalink.
+        #     results = await player.node.get_tracks(query)
+
+        # if not from_spotify:
+        #     if not results or not results['tracks']:
+        #         return await ctx.send('No results')
+
+        # embed = discord.Embed(color=discord.Color.blurple())
+        
+        # if from_spotify:
+        #     embed.title = f"{res_type.capitalize()} Enqueued"
+        #     embed.description = f"{newly_queued_tracks} tracks added."
+
+        # else:
+        #     # Kept here to protect from things being unhappy
+        #     # Valid loadTypes are:
+        #     #   TRACK_LOADED    - single video/direct URL)
+        #     #   PLAYLIST_LOADED - direct URL to playlist)
+        #     #   SEARCH_RESULT   - query prefixed with either ytsearch: or scsearch:.
+        #     #   NO_MATCHES      - query yielded no results
+        #     #   LOAD_FAILED     - most likely, the video encountered an exception during loading.
+        #     if results['loadType'] == 'PLAYLIST_LOADED':
+        #         tracks = results['tracks']
+
+        #         for track in tracks:
+        #             # Add all of the tracks from the playlist to the queue.
+        #             player.add(requester=ctx.author.id, track=track)
+
+        #         embed.title = 'Playlist Enqueued'
+        #         embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks' 
+        #     else:
+        #         track_load_handler(results)
+
+        await ctx.send(embed=await self._play(ctx, player, query))
 
         # We don't want to call .play() if the player is playing as that will effectively skip
         # the current track.
