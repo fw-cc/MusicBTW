@@ -16,14 +16,18 @@ configuration, as this will save you the pain of local networking shenanigans.
 that 👉 you test the bot 🤖 from within docker-compose 🐳.
 Make sure 🤗 any additions ➕ to the codebase 👨‍💻 go in their own branches 🌳,
 that way we can keep things clean 🧹.
+A good 👍 format 📄 for branch 🌲 names would 🪓 be 🐝 `<base-branch>-<feature-name>`
+where `<base-branch>` is, `master`, `1.0-dev`, or something of the sort 🧙‍♂️ and
+`<feature-name>` may be `shuffle-queue` such that your branch 🎄 would end up being
+called 💬 `1.0-dev-shuffle-queue`.
 
 See 👀 below 👇 for the feature hitlist 🎯!
 
 ### Feature Hitlist 🎯 (ticked ☑ when claimed, removed 👻 when done)
 
 - [ ] Queue shuffle command
-- [ ] Loop current track command
-- [ ] Loop queue command
+- [ ] Repeat current track command
+- [ ] Repeat queue command
 - [ ] Make bot stop playing and leave empty calls to save resources
 - [ ] Purge queue command (clear queue of tracks from people no longer in the call) (may be dank, idk yet)
 - [ ] Slash command implementation (moderately dank)
