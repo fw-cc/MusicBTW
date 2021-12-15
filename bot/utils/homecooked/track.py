@@ -1,4 +1,4 @@
-import bot.utils.downloader as downloader
+import bot.utils.homecooked.downloader as downloader
 
 from typing import Optional, List
 import logging

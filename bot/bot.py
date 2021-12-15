@@ -8,23 +8,32 @@ from discord.ext import commands
 
 
 class MusicBTW(commands.Bot):
-    def __init__(self, command_prefix, download_loc="", description=None, **options) -> None:
+    def __init__(self, command_prefix, description=None, **options) -> None:
         super().__init__(command_prefix, description=description, **options)
         self.start_datetime = datetime.datetime.now()
-        self.logger = self.__config_logging(logging_level=logging.DEBUG)
+        self.logging_level = logging.DEBUG
+        self.logger = self.__config_logging()
         self.logger.info(f"Command prefix: {command_prefix}")
         # Any other statup stuffs can go here
+
+    async def on_ready(self):
         path, _, cogs = next(os.walk("./bot/modules/"))
         for cog in cogs:
             # This is kinda naughty, when config eventually gets added, would be a good idea
             # to make the bot only load what it's told to from configs.
             if "__" not in cog:
-                self.load_extension(f"{path}{cog}".lstrip("./").replace("/", ".").rstrip(".py"))
+                sanitised_cog_name = f"{path}{cog}".lstrip("./").replace("/", ".").rstrip(".py")
+                try:
+                    self.logger.info(f"Loading {sanitised_cog_name}")
+                    self.load_extension(sanitised_cog_name)
+                except commands.ExtensionAlreadyLoaded:
+                    self.logger.debug(f"{sanitised_cog_name} already loaded")
+                except Exception as e:
+                    self.logger.exception(e)
     
-    @staticmethod
-    def __config_logging(logging_level=logging.INFO, outdir="./logs"):
+    def __config_logging(self, outdir="./logs"):
         logger = logging.getLogger("MusicBTW")
-        logger.setLevel(logging_level)
+        logger.setLevel(self.logging_level)
         formatter = logging.Formatter('[{asctime}] [{levelname:}] {name}: {message}',
                                       '%Y-%m-%d %H:%M:%S', style='{')
         # file_log = handlers.RotatingFileHandler(f'{outdir}/{self.start_datetime.strftime("%Y%m%d_%H%M%S")}.log',
