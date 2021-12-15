@@ -14,7 +14,7 @@ class MusicBTW(commands.Bot):
         self.logging_level = logging.DEBUG
         self.logger = self.__config_logging()
         self.logger.info(f"Command prefix: {command_prefix}")
-        # Any other statup stuffs can go here
+        # Any other startup stuffs can go here
 
     async def on_ready(self):
         path, _, cogs = next(os.walk("./bot/modules/"))
