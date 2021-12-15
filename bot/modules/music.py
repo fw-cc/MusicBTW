@@ -29,7 +29,7 @@ class LavalinkVoiceClient(discord.VoiceClient):
             self.client.lavalink.add_node(
                 "lavalink",
                 2333,
-                "youshallnotpass",
+                "itsindockersoitsprobablyfine",
                 "eu",
                 "default-node"
             )
@@ -94,7 +94,7 @@ class Interface(commands.Cog):
             if not hasattr(bot, 'lavalink'):  # This ensures the client isn't overwritten during cog reloads.
                 bot.lavalink = lavalink.Client(bot.user.id)
                 self.logger.info("Attempting to connect to Lavalink, may fail on first attempt in docker-compose.")
-                bot.lavalink.add_node('lavalink', 2333, 'youshallnotpass', 'eu', 'default-node')
+                bot.lavalink.add_node('lavalink', 2333, 'itsindockersoitsprobablyfine', 'eu', 'default-node')
                 self.logger.info("Added Lavalink node, will query until success.")
             else:
                 self.logger.debug("Interface reloaded, bot has lavalink attribute already")
