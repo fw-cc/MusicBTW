@@ -2,7 +2,8 @@
 Music bot penned in Python can usually play media from Youtube based on a Spotify URL (if you ask nicely), is somewhat capable of dealing with playlists, albums, 
 and individual tracks.
 
-Uses [Lavalink](https://github.com/freyacodes/Lavalink)
+Uses
+<a href=https://github.com/freyacodes/Lavalink target="_blank">Lavalink</a>
 to handle voice shenanigans until such a time as they're understood by mere mortals.
 Recommendation is therefore to run the bot with the supplied docker-compose
 configuration, as this will save you the pain of local networking shenanigans.
@@ -38,10 +39,12 @@ wrong (or forgotten to add it).
 
 Credentials can be got at these URLs:
 
-[Discord Developer Dashboard](https://discord.com/developers/applications/)
+<a href=https://discord.com/developers/applications/ target="_blank">
+Discord Developer Dashboard</a>
 (you'll need to register an application and then a bot by entering the 
 application settings).
 
-[Spotify Developer Dashboard](https://developer.spotify.com/dashboard/)
+<a href=https://developer.spotify.com/dashboard/ target="_blank">
+Spotify Developer Dashboard</a>
 (just set up an app in Development mode you won't ping the API enough to make
 Spotify upset, probably).
