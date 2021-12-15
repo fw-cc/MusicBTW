@@ -23,7 +23,7 @@ class Sourcer:
             query = f"{query} {artist}"
         return await node.get_tracks(query)
 
-    def __spotify_tracks_getter(self, spotify_response, from_album=False):
+    def __spotify_tracks_getter(self, spotify_response, from_album=False, from_playlist=False):
         """Generates a list of tracks for Spotify API responses to albums and playlists"""
         tracks_obj = spotify_response["tracks"]
         tracks_data_list = []
@@ -34,7 +34,9 @@ class Sourcer:
             tracks_obj = self.spotify_api.next(tracks_obj)
             tracks_data_list.extend(tracks_obj["items"])
         
-        if from_album:
+        if from_playlist:
+            tracks_data_list = [track["track"] for track in tracks_data_list]
+        elif from_album:
             for track in tracks_data_list:
                 try:
                     _ = track["album"]
@@ -61,7 +63,7 @@ class Sourcer:
                 if url_type == "album":
                     sp_track_list = self.__spotify_tracks_getter(self.spotify_api.album(source), from_album=True)
                 elif url_type == "playlist":
-                    sp_track_list = self.__spotify_tracks_getter(self.spotify_api.playlist(source))
+                    sp_track_list = self.__spotify_tracks_getter(self.spotify_api.playlist(source), from_playlist=True)
                 elif url_type == "track":
                     sp_track_list = [self.spotify_api.track(source)]
                 else:
@@ -72,4 +74,4 @@ class Sourcer:
             for sp_track in sp_track_list:
                 yield (await self._get_equiv_track_from_yt(sp_track, node), url_type)
             # return [await self._get_equiv_track_from_yt(sp_track, node) for sp_track in sp_track_list], url_type
-
+            
