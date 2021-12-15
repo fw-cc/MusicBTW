@@ -17,7 +17,7 @@ that way we can keep things clean 🧹.
 
 See 👀 below 👇 for the feature hitlist 🎯!
 
-### Feature Hitlist 🎯
+### Feature Hitlist 🎯 (ticked ☑ when claimed, removed 👻 when done)
 - [ ] Queue shuffle command
 - [ ] Loop current track command
 - [ ] Loop queue command
