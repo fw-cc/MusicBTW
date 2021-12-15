@@ -1,10 +1,10 @@
+from nextcord.ext import commands
+
 import logging
 import datetime
 import os
 
 from logging import handlers
-
-from discord.ext import commands
 
 
 class MusicBTW(commands.Bot):

@@ -1,7 +1,8 @@
+from nextcord.ext import commands
+
 from bot.utils.spotify import Sourcer
 
-from discord.ext import commands
-import discord
+import nextcord as discord
 import lavalink
 
 import logging
