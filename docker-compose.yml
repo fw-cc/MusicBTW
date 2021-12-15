@@ -1,6 +1,6 @@
 services:
   bot:
-    image: pytato/musicbtw:dev
+    image: pytato/musicbtw:1.0-dev-slash-commands
     env_file:
       - ./.env
     networks:
