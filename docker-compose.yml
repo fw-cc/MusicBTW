@@ -12,7 +12,6 @@ services:
       - backend
     volumes:
       - ./config/lavalink/application.yml:/opt/Lavalink/application.yml
-      - ./logs/lavalink:/opt/Lavalink/logs
 
 networks:
   backend:
