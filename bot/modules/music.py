@@ -23,7 +23,7 @@ class LavalinkVoiceClient(discord.VoiceClient):
     def __init__(self, client, voice_channel):
         self.client = self.bot = client
         self.channel = voice_channel
-        self.is_playing_bgm = False
+        self._is_playing_bgm = False
         # In the case there's an existing lavalink link link link
         if hasattr(self.client, "lavalink"):
             self.lavalink = self.client.lavalink
@@ -55,6 +55,10 @@ class LavalinkVoiceClient(discord.VoiceClient):
                 'd': data
                 }
         await self.lavalink.voice_update_handler(lavalink_data)
+    
+    @property
+    def is_playing_bgm(self):
+        return self._is_playing_bgm
 
     async def connect(self, *, timeout: float, reconnect: bool) -> None:
         """
@@ -62,7 +66,7 @@ class LavalinkVoiceClient(discord.VoiceClient):
         if it doesn't exist yet.
         """
         # ensure there is a player_manager when creating a new voice_client
-        self.lavalink.player_manager.create(guild_id=self.channel.guild.id)
+        player = self.lavalink.player_manager.create(guild_id=self.channel.guild.id)
         await self.channel.guild.change_voice_state(channel=self.channel)
 
     async def disconnect(self, *, force: bool) -> None:
@@ -110,6 +114,8 @@ class Interface(commands.Cog):
         lavalink.add_event_hook(self.on_queue_end, event=lavalink.events.QueueEndEvent)
         lavalink.add_event_hook(self.on_node_connect, event=lavalink.events.NodeConnectedEvent)
         lavalink.add_event_hook(self.on_node_disconnect, event=lavalink.events.NodeDisconnectedEvent)
+        lavalink.add_event_hook(self.on_track_stuck, event=lavalink.events.TrackStuckEvent)
+        lavalink.add_event_hook(self.on_track_error, event=lavalink.events.TrackExceptionEvent)
         lavalink.add_event_hook(self.on_node_change, event=lavalink.events.NodeChangedEvent)
 
     async def on_node_connect(self, event):
@@ -122,16 +128,28 @@ class Interface(commands.Cog):
     
     async def on_node_change(self, event):
         self.logger.info("Node changed from {0.name} to {1.name}".format(event.old_node, event.new_node))
+    
+    async def on_track_stuck(self, player, track, threshold):
+        self.logger.warn(f"Track {track.title} got stuck in playback, skipping")
+        await player.skip()
+
+    async def on_track_error(self, track, exception):
+        self.logger.exception(f"Track {track.name} produced an exception in playback",
+                              exc_info=(type(exception), exception, exception.__traceback__))
 
     async def on_queue_end(self, event):
         # Triggered on "QueueEndEvent" from lavalink.py
         # it indicates that there are no tracks left in the player's queue.
         # To save on resources, we can tell the bot to disconnect from the voice channel.
         self.logger.debug("QueueEndEvent triggered")
-        if not event.player.is_playing_bgm:
-            guild_id = int(event.player.guild_id)
-            guild = self.bot.get_guild(guild_id)
-            await guild.voice_client.disconnect(force=True)
+        guild_id = int(event.player.guild_id)
+        guild = self.bot.get_guild(guild_id)
+        try:
+            if not guild.voice_client.is_playing_bgm:
+                self.logger.debug("Disconnecting from event")
+                await guild.voice_client.disconnect(force=True)
+        except AttributeError:
+            pass
 
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voice channel. """
@@ -187,6 +205,8 @@ class Interface(commands.Cog):
 
         embed = discord.Embed(color=discord.Color.blurple())
 
+        from_spotify = False
+        res_type = None
         def track_load_handler(loc_results, spotify=False):
             track = loc_results['tracks'][0]
             if not spotify or res_type == "track":
@@ -199,8 +219,6 @@ class Interface(commands.Cog):
 
         # Check if the user input might be a URL. If it isn't, we can Lavalink do a YouTube search for it instead.
         # SoundCloud searching is possible by prefixing "scsearch:" instead.
-        from_spotify = False
-        res_type = None
         newly_queued_tracks = 0
         if not url_rx.match(query):
             query = f'ytsearch:{query}'
@@ -209,6 +227,7 @@ class Interface(commands.Cog):
             # Use the extra special sourcer to get good equivalents
             # of spotify tracks on the youtube
             # results, res_type = await self.sourcer.get_tracks(query, player.node)
+            # TODO: make this stop when the player is stopped!!!
             async for result, res_type in self.sourcer.get_tracks(query, player.node):
                 if not result or not result['tracks']:
                     pass
@@ -227,7 +246,7 @@ class Interface(commands.Cog):
                 return await ctx.send('No results')
         
         if from_spotify:
-            embed.title = f"{res_type.capitalize()} Enqueued"
+            embed.title = "Kanker"  # f"{res_type.capitalize()} Enqueued"
             embed.description = f"{newly_queued_tracks} tracks added."
 
         else:
@@ -265,13 +284,13 @@ class Interface(commands.Cog):
 
     async def _toggle_bgm(self, player, voice_client, force_on=False):
         if voice_client.is_playing_bgm:
-            voice_client.is_playing_bgm = False
+            voice_client._is_playing_bgm = False
             await player.stop()
             player.set_repeat(False)
             player.set_shuffle(False)
         elif not voice_client.is_playing_bgm or force_on:
             # Stops the bot from running through the full on_queue_end method
-            voice_client.is_playing_bgm = True
+            voice_client._is_playing_bgm = True
             await player.stop()
             player.set_repeat(True)
             player.set_shuffle(True)

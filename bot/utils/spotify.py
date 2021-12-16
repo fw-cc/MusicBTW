@@ -33,6 +33,7 @@ class Sourcer:
             tracks_obj = self.spotify_api.next(tracks_obj)
             tracks_data_list.extend(tracks_obj["items"])
         
+        # This boilerplate will need rewriting
         if from_playlist:
             tracks_data_list = [track["track"] for track in tracks_data_list]
         elif from_album:
@@ -41,7 +42,11 @@ class Sourcer:
                     _ = track["album"]
                 except KeyError:
                     track["album"] = {"name": spotify_response["name"]}
-        return tracks_data_list
+        tracks_to_ret = []
+        for track in tracks_data_list:
+            if not track["is_local"]:
+                tracks_to_ret.append(track)
+        return tracks_to_ret
 
     async def get_tracks(self, source: str, node):
         SPOTIFY_PATTERN = r"^(?P<main_url>(https?:\/\/open.)?spotify.com\/(?P<type>\w{4,20})\/.*)\?.*"
