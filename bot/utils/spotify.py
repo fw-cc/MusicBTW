@@ -13,7 +13,7 @@ class Sourcer:
     async def _get_equiv_track_from_yt(self, spotify_track, node):
         # Stopgap solution, will simply return a string containing the
         # title, album, and artist for Lavalink to query.
-        self.logger.debug(spotify_track)
+        # self.logger.debug(spotify_track)
         artists = [artist["name"] for artist in spotify_track["artists"]]
         query = f"ytsearch:{spotify_track['name']} {spotify_track['album']['name']}"
         # query = f"ytsearch:{spotify_track['name']}"
@@ -27,12 +27,14 @@ class Sourcer:
         tracks_obj = spotify_response["tracks"]
         tracks_data_list = []
         tracks_data_list.extend(tracks_obj["items"])
+        # self.logger.debug(tracks_obj)
         while tracks_obj['next'] is not None:
             # Since the Spotify API doesn't like us getting too much in one response we'll have to
             # batch get things ;-;        
             tracks_obj = self.spotify_api.next(tracks_obj)
             tracks_data_list.extend(tracks_obj["items"])
         
+        # This boilerplate will need rewriting
         if from_playlist:
             tracks_data_list = [track["track"] for track in tracks_data_list]
         elif from_album:
@@ -41,10 +43,15 @@ class Sourcer:
                     _ = track["album"]
                 except KeyError:
                     track["album"] = {"name": spotify_response["name"]}
-        return tracks_data_list
+        tracks_to_ret = []
+        for track in tracks_data_list:
+            if not track["is_local"]:
+                tracks_to_ret.append(track)
+        return tracks_to_ret
 
     async def get_tracks(self, source: str, node):
-        SPOTIFY_PATTERN = r"^(?P<main_url>(https?:\/\/open.)?spotify.com\/(?P<type>\w{4,20})\/.*)\?.*"
+        # OLD_SPOTIFY_PATTERN = r"^(?P<main_url>(https?:\/\/open.)?spotify.com\/(?P<type>\w{4,20})\/.*)\?.*"
+        SPOTIFY_PATTERN = r"^(?P<main_url>(https?:\/\/open.)?spotify.com\/(?P<type>\w{4,20})\/.*)"
         # YOUTUBE_PATTERN = r"^https?://.*(youtube\.com/(playlist\?list|watch)=|youtu\.be/)(.{34}|.{11})(\?t=(?P<time_offset>\d+))?"
         if regex_match := re.search(SPOTIFY_PATTERN, source):
             self.logger.debug("Matched Spotify URL")

@@ -7,7 +7,7 @@ Uses
 [Lavalink](https://github.com/freyacodes/Lavalink)
 to handle voice shenanigans until such a time as they're understood by mere mortals.
 Recommendation is therefore to run the bot with the supplied docker-compose
-configuration, as this will save you the pain of local networking shenanigans.
+configuration, as this will save you the pain of local networking not working.
 
 ## COnTRiBuTinG
 
