@@ -226,13 +226,22 @@ class Interface(commands.Cog):
         elif "spotify" in query and self.sourcer is not None:
             # Use the extra special sourcer to get good equivalents
             # of spotify tracks on the youtube
-            # results, res_type = await self.sourcer.get_tracks(query, player.node)
             # TODO: make this stop when the player is stopped!!!
+            self.logger.debug("Getting tracks from spotify")
             async for result, res_type in self.sourcer.get_tracks(query, player.node):
+                if player.channel_id is None:
+                    self.logger.debug("Ended track queue operation due to killed player A")
+                    break
+
                 if not result or not result['tracks']:
-                    pass
+                    self.logger.debug("Found no result for query")
                 else:
-                    track_load_handler(result, spotify=True)
+                    try:
+                        track_load_handler(result, spotify=True)
+                    except AttributeError:
+                        # This **should** trigger on player deletion
+                        self.logger.debug("Ended track queue operation due to killed player B")
+                        break
                     newly_queued_tracks += 1
                     if newly_queued_tracks == 1 and not player.is_playing:
                         await player.play()
@@ -389,6 +398,11 @@ class Interface(commands.Cog):
         if player.paused:
             self.logger.debug("Resuming player")
             await player.set_pause(False)
+
+    @commands.command()
+    async def queue(self, ctx):
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        self.logger.debug(f"Queue:\n{player.queue}")
 
     async def cog_check(self, ctx):
         if not ctx.guild:
