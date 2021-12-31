@@ -1,6 +1,6 @@
 services:
   bot:
-    image: pytato/musicbtw:1.0-dev-bgm
+    image: pytato/musicbtw:1.0-dev
     env_file:
       - ./.env
     networks:
