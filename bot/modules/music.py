@@ -7,6 +7,7 @@ from bot.utils.spotify import Sourcer
 import discord
 import lavalink
 
+import asyncio
 import logging
 import re
 
@@ -109,6 +110,8 @@ class Interface(commands.Cog):
             bot.lavalink = self.lavalink
         except Exception as e:
             self.logger.exception(e, exc_info=(type(e), e, e.__traceback__))
+
+        self.curr_play_info_messages = {}  # {guild_id: message_obj}
         # Probably worth adding some kind of decorator event hook registration interface
         # to lavalink.py at some point...
         lavalink.add_event_hook(self.on_queue_end, event=lavalink.events.QueueEndEvent)
@@ -285,12 +288,6 @@ class Interface(commands.Cog):
 
         return embed
 
-    # @commands.group()
-    # async def bgm(self, ctx: commands.Context):
-    #     """Command group for BGM management"""
-    #     if ctx.invoked_subcommand is None:
-    #         pass
-
     async def _toggle_bgm(self, player, voice_client, force_on=False):
         if voice_client.is_playing_bgm:
             voice_client._is_playing_bgm = False
@@ -403,6 +400,76 @@ class Interface(commands.Cog):
     async def queue(self, ctx):
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         self.logger.debug(f"Queue:\n{player.queue}")
+
+    async def __placeholder_is_active(self, guild_id):
+        loops = 0
+        self.logger.debug("Checking for placeholder, expect debug confirmation on progression")
+        # ~30s timeout, anything being done should be done by this point
+        while loops < 60:
+            loops += 1
+            await asyncio.sleep(0.5)
+            if self.curr_play_info_messages[guild_id] != "UPDATING":
+                self.logger.debug("Placeholder not found, proceeding with message update")
+                return False
+        # Occurs if and only if loop times out, any changes to the track tracking message tracker
+        # will yield an early return
+        self.logger.exception(f"Placeholder message persisting in track tracking message "
+        f"tracking:\n{self.curr_play_info_messages[guild_id]}")
+        return True
+
+    async def currently_playing_msg(self, ctx):
+        """Handles message in channel with information about the currently playing track,
+        no persistence across restarts of the bot but otherwise will delete old messages
+        and send new ones.
+        """
+        str_guild_id = str(ctx.guild.id)
+        # First thing is to handle previously sent messages that the bot knows about:
+        try:
+            prev_msg = self.curr_play_info_messages[str_guild_id]
+            # prev_msg can also take the form of a placeholder: "UPDATING", warning that an update is
+            # taking place
+            if prev_msg == "UPDATING":
+                if await self.__placeholder_is_active(str_guild_id):
+                    # On this conditional something is very broken, 30s have elapsed and the placeholder
+                    # has not been removed
+                    return
+                else:
+                    # Update the locally cached instance of the old message so the world can go on spinning
+                    prev_msg = self.curr_play_info_messages[str_guild_id]
+        except KeyError:
+            prev_msg = None
+        # Now block off any other instances of this coroutine from messing with this guild's message
+        self.curr_play_info_messages[str_guild_id] = "UPDATING"
+        self.logger.debug(prev_msg)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not player.is_playing:
+            # In the case the player is not longer playing, clean up by removing placeholder and deleting
+            # the unneeded update message before returning
+            del self.curr_play_info_messages[str_guild_id]
+            await prev_msg.delete()
+            return
+        
+        edit_instead_of_delete = False
+        if prev_msg is not None:
+            if prev_msg.id == prev_msg.channel.last_message_id:
+                # Saves users of improperly configured servers some notification based pains
+                edit_instead_of_delete = True
+        
+        current_track = player.current
+        new_msg_content = f"Currently {'playing' if not current_track.stream else 'streaming'}: " \
+                          f"`{current_track.title}`\n\n" \
+                          f"Source: <{current_track.uri}>"
+        if edit_instead_of_delete:
+            # Docs indicate this isn't permitted but edited version of the message is actually
+            # returned by the library, which is nice
+            new_msg = await prev_msg.edit(content=new_msg_content)
+            self.logger.debug("Edited currently playing message")
+        else:
+            new_msg = await ctx.send(new_msg_content)
+            self.logger.debug("Sent currently playing message")
+        # With this, the placeholder will be removed and waiting instances of this coroutine
+        # can be allowed to progress
+        self.curr_play_info_messages[str_guild_id] = new_msg
 
     async def cog_check(self, ctx):
         if not ctx.guild:
