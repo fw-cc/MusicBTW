@@ -1,6 +1,6 @@
 services:
   bot:
-    image: pytato/musicbtw:1.0-dev
+    image: pytato/musicbtw:1.0-dev-curr-play
     env_file:
       - ./.env
     networks:
